@@ -413,7 +413,7 @@ class Dklab_SoapClient_Request
     {
         $cookies = array();
         foreach (preg_split('/\r?\n/s', $headers) as $header) {
-            @list($headername, $headervalue) = split(':', $header);
+            @list($headername, $headervalue) = explode(':', $header);
             if (strtolower($headername) == "set-cookie") {
                 $cookie = $this->_parseCookieValue(trim($headervalue));
                 $cookies[$cookie['name']] = $cookie['value'];
