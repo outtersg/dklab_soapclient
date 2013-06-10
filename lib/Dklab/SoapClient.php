@@ -655,7 +655,20 @@ class Dklab_SoapClient_Curl
             $response = curl_getinfo($request->handle);
             $response['result'] = $done['result'];
             $response['result_timeout'] = $response["result"] === CURLE_OPERATION_TIMEOUTED? ($response["request_size"] <= 0? 'connect' : 'data') : null;
-            @list($response['headers'], $response['body']) = preg_split('/\r?\n\r?\n/s', curl_multi_getcontent($request->handle), 2);
+            // Split headers from body. Problem is, when tunnelled through a proxy,
+            // we will have multiple header blocks, e.g.:
+            // HTTP/1.0 200 Connection established
+            // 
+            // HTTP/1.1 200 OK
+            // Date: Fri, 07 Jun 2013 08:14:21 GMT
+            // Content-Type: text/xml;charset=utf-8
+            // 
+            // <.xml version='1.0' encoding='utf-8'.>
+            // <soapenv:Envelope ...
+            $response['body'] = curl_multi_getcontent($request->handle);
+            while (strncmp($response['body'], 'HTTP/', 5) == 0) { // Hurmph, is that the best way to detect an HTTP header block?
+                @list($response['headers'], $response['body']) = preg_split('/\r?\n\r?\n/s', $response['body'], 2);
+            }
             curl_multi_remove_handle($this->_handler, $request->handle);
             // Process validation and possibly retry procedure.
             if (
