@@ -758,6 +758,13 @@ class Dklab_SoapClient_Curl
         $curlOptions[CURLOPT_FOLLOWLOCATION] = false;
         // More debugging.
         $curlOptions[CURLINFO_HEADER_OUT] = true;
+        
+        // By default, we don't want to check the certificate
+        $curlOptions[CURLOPT_SSL_VERIFYPEER] = false;
+        if (!empty($clientOptions[CURLOPT_SSL_VERIFYPEER])) {
+            $curlOptions[CURLOPT_SSL_VERIFYPEER] = $clientOptions[CURLOPT_SSL_VERIFYPEER];
+        }
+        
     	// Init and return the handle.
         $curlHandler = curl_init();
         curl_setopt_array($curlHandler, $curlOptions);
