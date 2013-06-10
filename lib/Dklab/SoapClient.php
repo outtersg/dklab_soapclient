@@ -114,7 +114,7 @@ class Dklab_SoapClient extends SoapClient
             parent::__soapCall($functionName, $arguments, $options, $inputHeaders, $outputHeaders);
         } catch (Dklab_SoapClient_DelayedException $e) {
         }
-        $request = new Dklab_SoapClient_Request($this, $this->_recordedRequest, $args, $this->_clientOptions);
+        $request = new Dklab_SoapClient_Request($this, $args);
         $this->_recordedRequest = null;
         if ($isAsync) {
             // In async mode - return the request.
@@ -167,6 +167,22 @@ class Dklab_SoapClient extends SoapClient
             $this->_hasForcedResponse = false;
             throw $e;
         }
+    }
+    
+    /**
+     * Getter for clientOptions
+     */
+    public function getClientOptions()
+    {
+        return $this->_clientOptions;
+    }
+    
+    /**
+     * Getter for _recordedRequest
+     */
+    public function getRecordedRequest()
+    {
+        return $this->_recordedRequest;
     }
     
     /**
@@ -279,31 +295,29 @@ class Dklab_SoapClient_Request
      * Create a new asynchronous cURL request.
      * 
      * @param Dklab_SoapClient $client
-     * @param array $request             Information about SOAP request.
      * @param array $callArgs            Arguments to call __soapCall().
-     * @param array $clientOptions       SoapClient constructor options.
      */
-    public function __construct(Dklab_SoapClient $client, $request, $callArgs, $clientOptions)
+    public function __construct(Dklab_SoapClient $client, $callArgs)
     {
         if (!self::$_curl) {
             self::$_curl = new Dklab_SoapClient_Curl();
         }
         $this->_client = $client;
-        $this->_request = $request;
+        $this->_request = $this->_client->getRecordedRequest();
         $this->_callArgs = $callArgs;
-        $this->_url = $request['location'];
+        $this->_url = $this->_request['location'];
+        $clientOptions = $this->_client->getClientOptions();
+        
         // Initialize curl request and add it to the queue.
         $curlOptions = array();
-        $curlOptions[CURLOPT_URL] = $request['location']; 
+        $curlOptions[CURLOPT_URL] = $this->_request['location'];
         $curlOptions[CURLOPT_POST] = 1;
-        $curlOptions[CURLOPT_POSTFIELDS] = $request['request'];
+        $curlOptions[CURLOPT_POSTFIELDS] = $this->_request['request'];
         $curlOptions[CURLOPT_RETURNTRANSFER] = 1;
         $curlOptions[CURLOPT_HTTPHEADER] = array();
-        // SOAP protocol encoding is always UTF8 according to RFC.
-        $curlOptions[CURLOPT_HTTPHEADER][] = "Content-Type: application/soap+xml; charset=utf-8";
         // adding SoapAction Header
-	if (isset($request['action'])) {
-	    $curlOptions[CURLOPT_HTTPHEADER][] = 'SOAPAction: "' . $request['action'] . '"';
+        if (isset($this->_request['action'])) {
+            $curlOptions[CURLOPT_HTTPHEADER][] = 'SOAPAction: "' . $this->_request['action'] . '"';
 	}
         // Timeout handling.
         if (isset($clientOptions['timeout'])) {
@@ -325,14 +339,14 @@ class Dklab_SoapClient_Request
             $curlOptions[CURLOPT_USERPWD] = $clientOptions['login'] . ":" . $clientOptions['password'];
         }
         // Cookies.       
-        if ($request['cookies']) {
+        if ($this->_request['cookies']) {
             $pairs = array();
-            foreach ($request['cookies'] as $k => $v) {
+            foreach ($this->_request['cookies'] as $k => $v) {
                 $pairs[] = urlencode($k) . "=" . urlencode($v);
             }
             $curlOptions[CURLOPT_COOKIE] = join("; ", $pairs);
         } 
-        $this->_handler = self::$_curl->addRequest($curlOptions); 
+        $this->_handler = self::$_curl->addRequest($curlOptions, $clientOptions); 
     }
     
     /**
@@ -538,10 +552,11 @@ class Dklab_SoapClient_Curl
      * Add a cURL request to the queue.
      * Request is specified by its cURL options.
      * 
-     * @param array $curlOptions   Options to pass to cURL. 
+     * @param array $curlOptions   Options to pass to cURL.
+     * @param array $clientOptions Options to pass to cURL, from the client.
      * @return string              Identifier of the added request. 
      */
-    public function addRequest($curlOptions)
+    public function addRequest($curlOptions, $clientOptions)
     {
         // Extract custom options.
         $responseValidator = null;
@@ -551,7 +566,7 @@ class Dklab_SoapClient_Curl
         }        
 
         // Create a cURL handler.
-        $curlHandler = $this->_createCurlHandler($curlOptions);
+        $curlHandler = $this->_createCurlHandler($curlOptions, $clientOptions);
         
         $key = (string)$curlHandler;
         // Add it to the queue. Note that we NEVER USE curl_copy_handle(),
@@ -689,8 +704,30 @@ class Dklab_SoapClient_Curl
      * @param array $curlOptions
      * @return resource 
      */
-    private function _createCurlHandler($curlOptions)
+    private function _createCurlHandler($curlOptions, $clientOptions)
     {
+        // SOAP protocol encoding is always UTF8 according to RFC.
+        // But some SOAP servers do not like application/soap+xml, they want text/xml.
+        // Let the caller override it
+        if(!empty($clientOptions[CURLOPT_HTTPHEADER]) && !empty($clientOptions[CURLOPT_HTTPHEADER]['Content-Type'])) {
+            $curlOptions[CURLOPT_HTTPHEADER][] = $clientOptions[CURLOPT_HTTPHEADER]['Content-Type'];
+        }
+        else {
+            // Default header
+            $curlOptions[CURLOPT_HTTPHEADER][] = "Content-Type: application/soap+xml; charset=utf-8";
+        }
+        
+        // Allow to do a request through a proxy
+        if (!empty($clientOptions['proxy_host']) && !empty($clientOptions['proxy_port'])) {
+            $curlOptions[CURLOPT_PROXY] = $clientOptions['proxy_host'].':'.$clientOptions['proxy_port'];
+        }
+        
+        // TODO : allow other authentication methods
+        // We assume than the authentication method is "Basic"
+        if (!empty($clientOptions['proxy_login']) && !empty($clientOptions['proxy_password'])) {
+            $curlOptions[CURLOPT_HTTPHEADER][] = "Proxy-Authorization: Basic ".base64_encode($clientOptions['proxy_login'].':'.$clientOptions['proxy_password']);
+        }
+        
         // Disable "100 Continue" header sending. This avoids problems with large POST.
     	$curlOptions[CURLOPT_HTTPHEADER][] = 'Expect:';
         // ALWAYS fetch with headers!
