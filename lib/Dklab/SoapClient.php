@@ -214,6 +214,12 @@ class Dklab_SoapClient_AsyncCaller
         $this->_client = $client;
     }
     
+    public function __soapCall($functionName, $arguments, $options)
+    {
+        $options += array('async' => true);
+        return $this->_client->__soapCall($functionName, $arguments, $options);
+    }
+    
     public function __call($functionName, $arguments)
     {
         return $this->_client->__soapCall($functionName, $arguments, array('async' => true));
