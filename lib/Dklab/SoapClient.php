@@ -321,6 +321,9 @@ class Dklab_SoapClient_Request
         $curlOptions[CURLOPT_POSTFIELDS] = $this->_request['request'];
         $curlOptions[CURLOPT_RETURNTRANSFER] = 1;
         $curlOptions[CURLOPT_HTTPHEADER] = array();
+        if (isset($clientOptions['http_headers'])) {
+            $curlOptions[CURLOPT_HTTPHEADER] = $clientOptions['http_headers'];
+        }
         // adding SoapAction Header
         if (isset($this->_request['action'])) {
             $curlOptions[CURLOPT_HTTPHEADER][] = 'SOAPAction: "' . $this->_request['action'] . '"';
