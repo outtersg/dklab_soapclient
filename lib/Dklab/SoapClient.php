@@ -471,6 +471,9 @@ class Dklab_SoapClient_Request
             $cookie['name']  = urldecode($cookie['name']);
             $cookie['value'] = urldecode($cookie['value']);
             for ($i = 1; $i < count($elements); $i++) {
+                if (false === strpos($elements[$i], '=')) {
+                    continue;
+                }
                 list($elName, $elValue) = array_map('trim', explode('=', $elements[$i]));
                 if ('secure' == $elName) {
                     $cookie['secure'] = true;
