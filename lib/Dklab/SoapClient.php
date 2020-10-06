@@ -74,6 +74,7 @@ class Dklab_SoapClient extends SoapClient
             'request'  => "" . $request,
             'location' => "" . $location,
             'action'   => "" . $action,
+            'version'  => "" . $version,
             'cookies'  => $this->_cookies,
         );
         throw new Dklab_SoapClient_DelayedException();
@@ -323,6 +324,10 @@ class Dklab_SoapClient_Request
         $curlOptions[CURLOPT_HTTPHEADER] = array();
         if (isset($clientOptions['http_headers'])) {
             $curlOptions[CURLOPT_HTTPHEADER] = $clientOptions['http_headers'];
+        }
+        // SOAP version has to be consolidated.
+        if (!isset($clientOptions['soap_version']) && isset($this->_request['version'])) {
+            $clientOptions['soap_version'] = $this->_request['version'];
         }
         // adding SoapAction Header
         if (isset($this->_request['action'])) {
@@ -732,14 +737,25 @@ class Dklab_SoapClient_Curl
     private function _createCurlHandler($curlOptions, $clientOptions)
     {
         // SOAP protocol encoding is always UTF8 according to RFC.
-        // But some SOAP servers do not like application/soap+xml, they want text/xml.
-        // Let the caller override it
+        // SOAP 1.1 would like text/xml, SOAP 1.2 application/soap+xml, and PHP SOAP implementation cannot determine it
+        // from the SDL, so either the caller mentions it explicitely, or we're on the default implementation (looking
+        // like a 1.1).
+        // On the "good news" side, as this Java-world-emanating spec is overly complex, no implementation manages to be
+        // 100% correct, so servers are quite permissive (in fact nobody cares).
+        // Here would have been glad to detect soap_version from the SDL, however it would require a reparsing of the
+        // WSDL as PHP C implementation itself does not detect, or detects and forgets to tell. And reparsing the thing
+        // is a mess (the same WSDL can have two bindings, one in 1.1 and one in 1.2, for the same method).
+        // So do a "randomly-best-effort", and in fine let the caller decide if she wants to.
         if(!empty($clientOptions[CURLOPT_HTTPHEADER]) && !empty($clientOptions[CURLOPT_HTTPHEADER]['Content-Type'])) {
             $curlOptions[CURLOPT_HTTPHEADER][] = $clientOptions[CURLOPT_HTTPHEADER]['Content-Type'];
         }
         else {
             // Default header
-            $curlOptions[CURLOPT_HTTPHEADER][] = "Content-Type: application/soap+xml; charset=utf-8";
+            $curlOptions[CURLOPT_HTTPHEADER][] =
+                isset($clientOptions['soap_version']) && $clientOptions['soap_version'] == SOAP_1_2
+                ? "Content-Type: application/soap+xml; charset=utf-8"
+                : "Content-Type: text/xml; charset=utf-8"
+            ;
         }
         
         // Allow to do a request through a proxy
