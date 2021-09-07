@@ -1,0 +1,17 @@
+{
+	"name": "gui/dklab_soapclient",
+	"description": "Dmitriy Koterov's curl_multi SoapClient",
+	"version": "0.93.x-dev",
+	"license": "LGPL-2.1",
+	"authors":
+	[
+		{
+			"name": "Dmitry Koterov",
+			"email": "dmitry.koterov@gmail.com"
+		}
+	],
+	"require":
+	{
+		"php": ">= 5.2.0"
+	}
+}
