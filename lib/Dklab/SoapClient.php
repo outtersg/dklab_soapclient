@@ -104,7 +104,7 @@ class Dklab_SoapClient extends SoapClient
     {
         $isAsync = false;
         if (!empty($options['async'])) {
-            $isAsync = true;
+            $isAsync = $options['async'];
             unset($options['async']);
         }
         $args = func_get_args();
@@ -115,7 +115,7 @@ class Dklab_SoapClient extends SoapClient
             parent::__soapCall($functionName, $arguments, $options, $inputHeaders, $outputHeaders);
         } catch (Dklab_SoapClient_DelayedException $e) {
         }
-        $request = new Dklab_SoapClient_Request($this, $args);
+        $request = new Dklab_SoapClient_Request($this, $args, $isAsync);
         $this->_recordedRequest = null;
         if ($isAsync) {
             // In async mode - return the request.
@@ -303,12 +303,14 @@ class Dklab_SoapClient_Request
      * 
      * @param Dklab_SoapClient $client
      * @param array $callArgs            Arguments to call __soapCall().
+     * @param null|int $throttle         If set, limit to $throttle concurrently running requests.
      */
-    public function __construct(Dklab_SoapClient $client, $callArgs)
+    public function __construct(Dklab_SoapClient $client, $callArgs, $throttle = null)
     {
         if (!self::$_curl) {
             self::$_curl = new Dklab_SoapClient_Curl();
         }
+        self::$_curl->throttle($throttle);
         $this->_client = $client;
         $this->_request = $this->_client->getRecordedRequest();
         $this->_callArgs = $callArgs;
@@ -561,6 +563,21 @@ class Dklab_SoapClient_Curl
     private $_requests = array();
     
     /**
+     * Maximum number of running queries.
+     * Overflowing ones are put on wait until another request finishes.
+     *
+     * @var int|null
+     */
+    private $_maxRunners = null;
+
+    /**
+     * Request that could not be launched because our queue is full ($this->_maxRunners).
+     *
+     * @var array
+     */
+    private $_waiters = array();
+
+    /**
      * Create a new manager.
      */
     function __construct()
@@ -568,6 +585,16 @@ class Dklab_SoapClient_Curl
         $this->_handler = curl_multi_init();
     }
     
+    /**
+     * Limit concurrently running requests.
+     *
+     * @param int|null $maxRunners Number of running requests.
+     */
+    public function throttle($maxRunners)
+    {
+        $this->_maxRunners = $maxRunners > 0 ? $maxRunners : null;
+    }
+
     /**
      * Add a cURL request to the queue.
      * Request is specified by its cURL options.
@@ -597,6 +624,10 @@ class Dklab_SoapClient_Curl
             'tries'      => 1,
             'validator'  => $responseValidator,
         );
+        if (isset($this->_maxRunners) && count($this->_requests) - count($this->_waiters) > $this->_maxRunners) {
+            $this->_waiters[$key] = $request;
+            return $key;
+        }
         // Begin the processing.
         $this->_addCurlRequest($request, $key);
         return $key;
@@ -709,6 +740,24 @@ class Dklab_SoapClient_Curl
                 unset($this->_requests[$key]);
                 $this->_responses[$key] = $response;
                 curl_close($request->handle);
+
+                $this->_refill();
+            }
+        }
+    }
+
+    private function _refill()
+    {
+        if (($toRun = count($this->_waiters))) {
+            if (isset($this->_maxRunners)) {
+                $toRun += $this->_maxRunners - count($this->_requests);
+            }
+            foreach ($this->_waiters as $key => $request) {
+                if (--$toRun <= 0) {
+                    break;
+                }
+                $this->_addCurlRequest($request, $key);
+                unset($this->_waiters[$key]);
             }
         }
     }
@@ -828,9 +877,11 @@ class Dklab_SoapClient_Curl
     	$time = microtime(true);
     	$min = 100000;
     	foreach ($this->_requests as $request) {
+            if (isset($request->timeout_at)) {
     		// May be negative value here in case when a request is timed out,
     		// it's a quite common case.
     		$min = min($min, $request->timeout_at - $time);
+            }
     	}
     	// Minimum delay is 1 ms to be protected from busy wait.
     	$min = max($min, 0.001);
