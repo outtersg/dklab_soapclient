@@ -615,7 +615,7 @@ class Dklab_SoapClient_Curl
         // Create a cURL handler.
         $curlHandler = $this->_createCurlHandler($curlOptions, $clientOptions);
         
-        $key = (string)$curlHandler;
+        $key = is_object($curlHandler) ? spl_object_hash($curlHandler) : (string)$curlHandler;
         // Add it to the queue. Note that we NEVER USE curl_copy_handle(),
         // because it seems to be buggy and corrupts the memory.
         $request = $this->_requests[$key] = (object)array(
@@ -700,7 +700,7 @@ class Dklab_SoapClient_Curl
     {
         while ($done = curl_multi_info_read($this->_handler)) {
             // Get a key and request for this handle. 
-            $key = (string)$done['handle'];
+            $key = is_object($handle = $done['handle']) ? spl_object_hash($handle) : (string)$handle;
             $request = $this->_requests[$key];
             // Build the full response array and remove the handle from queue.
             $response = curl_getinfo($request->handle);
