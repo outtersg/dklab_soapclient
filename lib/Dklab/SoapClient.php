@@ -746,19 +746,28 @@ class Dklab_SoapClient_Curl
         }
     }
 
+    /**
+     * Triggers a waiting request, if a slot gets freed.
+     * /!\ This function may be called with reentrancy, as it calls _addCurlRequest which can trigger a
+     *     curl_multi_exec that in turn detects newly finished requests and calls _refill().
+     */
     private function _refill()
     {
-        if (($toRun = count($this->_waiters))) {
-            if (isset($this->_maxRunners)) {
-                $toRun += $this->_maxRunners - count($this->_requests);
-            }
-            foreach ($this->_waiters as $key => $request) {
-                if (--$toRun <= 0) {
+        while (($toRun = count($this->_waiters))) {
+            // Stop if reaching the maximum number of concurrently running requests.
+            if (
+                isset($this->_maxRunners)
+                // $this->_requests includes the ones remaining to run, so subtract to get the count of running tasks.
+                && $this->_maxRunners <= (count($this->_requests) - $toRun)
+            ) {
                     break;
                 }
-                $this->_addCurlRequest($request, $key);
-                unset($this->_waiters[$key]);
+            // Shift to get both key and value of first item.
+            foreach ($this->_waiters as $key => $request) {
+                break;
             }
+            unset($this->_waiters[$key]);
+            $this->_addCurlRequest($request, $key);
         }
     }
     
