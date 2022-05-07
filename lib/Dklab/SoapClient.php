@@ -662,6 +662,35 @@ class Dklab_SoapClient_Curl
     }
 
     /**
+     * Wait for activity and tells which requests got a result.
+     *
+     * @param boolean $doConsume If true, the returned results are consumed as done by getResult(); if false the caller has to call getResult().
+     *
+     * @return null|array Array of received responses (or null if all requests have finished, and results have been grasped).
+     */
+    public function getAvailableResults($doConsume = true)
+    {
+        if (!count($this->_requests) && !count($this->_responses)) {
+            return null;
+        }
+
+        while (!count($this->_responses) && $this->_execCurl(true) > 0) {
+            // For now, implement a non-blocking mode, so break here. Skipping the break would implement a waitAvailableResults.
+            break;
+        }
+
+        if (!$doConsume) {
+            return $this->_responses;
+        }
+
+        $results = array();
+        foreach ($this->_responses as $key => $request) {
+            $results[$key] = $this->getResult($key);
+        }
+        return $results;
+    }
+
+    /**
      * Wait for a connection is established.
      * If a timeout occurred, this method does not throw an exception:
      * it is done within getResult() call only.
