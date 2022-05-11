@@ -519,6 +519,14 @@ class Dklab_SoapClient_Request
 
 /**
  * cURL multi-request manager.
+ *
+ * Allows callbacks to be called, either with the full response (use
+ * 'callback' key in addRequest()'s $curlOptions) or only the body (use
+ * 'body_callback').
+ * Those callback can be used to:
+ *   - be notified of a result arrival
+ *   - rework the response
+ * The callback MUST return the response (original or modified).
  * 
  * Also support connection retries and response validation. To
  * implement validation and connection retry, use 'response_validator' 
@@ -611,6 +619,9 @@ class Dklab_SoapClient_Curl
             $responseValidator = $curlOptions['response_validator'];
             unset($curlOptions['response_validator']);
         }        
+        $requestOptionsKeys = array('callback' => true, 'body_callback' => true);
+        $requestOptions = array_intersect_key($curlOptions, $requestOptionsKeys);
+        $curlOptions = array_diff_key($curlOptions, $requestOptionsKeys);
 
         // Create a cURL handler.
         $curlHandler = $this->_createCurlHandler($curlOptions, $clientOptions);
@@ -618,12 +629,12 @@ class Dklab_SoapClient_Curl
         $key = is_object($curlHandler) ? spl_object_hash($curlHandler) : (string)$curlHandler;
         // Add it to the queue. Note that we NEVER USE curl_copy_handle(),
         // because it seems to be buggy and corrupts the memory.
-        $request = $this->_requests[$key] = (object)array(
+        $request = $this->_requests[$key] = (object)(array(
             'handle'     => $curlHandler,
             'options'    => $curlOptions, 
             'tries'      => 1,
             'validator'  => $responseValidator,
-        );
+        ) + $requestOptions);
         if (isset($this->_maxRunners) && count($this->_requests) - count($this->_waiters) > $this->_maxRunners) {
             $this->_waiters[$key] = $request;
             return $key;
@@ -767,6 +778,17 @@ class Dklab_SoapClient_Curl
                 // No tries left or this is a DATA timeout which is never retried.
                 // Remove this request from queue and save the response.
                 unset($this->_requests[$key]);
+
+                // Attach the callbacks to the response; do not execute here, but
+                // wait until getResult(), to avoid stack exhaust if the callback
+                // adds new requests.
+                if (isset($request->callback)) {
+                    $response['callback'] = $request->callback;
+                }
+                if (isset($request->body_callback) && isset($response['body'])) {
+                    $response['body_callback'] = $request->body_callback;
+                }
+
                 $this->_responses[$key] = $response;
                 curl_close($request->handle);
 
@@ -812,9 +834,31 @@ class Dklab_SoapClient_Curl
         if (isset($this->_responses[$key])) {
             $result = $this->_responses[$key];
             unset($this->_responses[$key]);
+            if (isset($result['callback'])) {
+                $result = $this->_callback($result['callback'], $result);
+            }
+            if (isset($result['body_callback']) && isset($result['body'])) {
+                $result['body'] = $this->_callback($result['body_callback'], $result['body']);
+            }
             return $result;
         }
         return null;
+    }
+
+    /**
+     * Calls a callback.
+     * Tries hard to detect if $callback includes fixed args to pass to the callback, after the callable itself.
+     */
+    private function _callback($callback, $params)
+    {
+        $params = func_get_args();
+        $callable = array_shift($params);
+        if (is_array($callable)) {
+            if (count($callable) > 2) {
+                $params = array_merge(array_splice($callable, 2), $params);
+            }
+        }
+        return call_user_func_array($callable, $params);
     }
     
     /**
