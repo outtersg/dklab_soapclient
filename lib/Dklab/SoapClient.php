@@ -804,6 +804,10 @@ class Dklab_SoapClient_Curl
      */
     private function _refill()
     {
+        if (isset($this->_alreadyFilling)) {
+            return;
+        }
+        $this->_alreadyFilling = true;
         while (($toRun = count($this->_waiters))) {
             // Stop if reaching the maximum number of concurrently running requests.
             if (
@@ -820,6 +824,7 @@ class Dklab_SoapClient_Curl
             unset($this->_waiters[$key]);
             $this->_addCurlRequest($request, $key);
         }
+        unset($this->_alreadyFilling);
     }
     
     /**
