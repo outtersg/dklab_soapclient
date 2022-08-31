@@ -35,7 +35,7 @@
  * caused on Windows. Don't know yet how to work-around it... This bug
  * is not clearly reproducible.
  *
- * @version 0.93
+ * @version 0.94
  */
 class Dklab_SoapClient extends SoapClient
 {
