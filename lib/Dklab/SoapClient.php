@@ -116,11 +116,10 @@ class Dklab_SoapClient extends SoapClient
      */
     public function __soapCall($functionName, $arguments, $options = array(), $inputHeaders = null, &$outputHeaders = null)
     {
-        $isAsync = false;
-        if (!empty($options['async'])) {
-            $isAsync = $options['async'];
-            unset($options['async']);
+        if (($throttle = $isAsync = !empty($options['async']))) {
+            $throttle = is_numeric($options['async']) ? $options['async'] : static::$DEFAULT_ASYNC_THROTTLING;
         }
+        unset($options['async']);
         $args = func_get_args();
         try {
         	// Unfortunately, we cannot use call_user_func_array(), because
@@ -129,7 +128,7 @@ class Dklab_SoapClient extends SoapClient
             parent::__soapCall($functionName, $arguments, $options, $inputHeaders, $outputHeaders);
         } catch (Dklab_SoapClient_DelayedException $e) {
         }
-        $request = new Dklab_SoapClient_Request($this, $args, $isAsync === true ? static::$DEFAULT_ASYNC_THROTTLING : $isAsync);
+        $request = new Dklab_SoapClient_Request($this, $args, $throttle);
         $this->_recordedRequest = null;
         if ($isAsync) {
             // In async mode - return the request.
