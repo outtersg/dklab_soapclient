@@ -39,6 +39,20 @@
  */
 class Dklab_SoapClient extends SoapClient
 {
+    /**
+     * Which number of concurrent request do we default to when in async mode?
+     * This is used when an instance is created with an 'async' option to true;
+     * integer values passed in 'async' explicitely set the number of requests
+     * to throttle to, overriding this default.
+     * Note that a null default means no throttling (try to reach max
+     * throughput when in async mode).
+     * /!\ An 'async' of 1 will _not_ be considered a true, but merely a way
+     *     of simulating sync mode (1 by 1 request) over async (to avoid
+     *     modifying the caller's result handling, which is different in
+     *     async mode, with an explicit getResult() to call).
+     */
+    public static $DEFAULT_ASYNC_THROTTLING = null;
+
     private $_recordedRequest = null;
     private $_hasForcedResponse = false;
     private $_forcedResponse = null;
@@ -115,7 +129,7 @@ class Dklab_SoapClient extends SoapClient
             parent::__soapCall($functionName, $arguments, $options, $inputHeaders, $outputHeaders);
         } catch (Dklab_SoapClient_DelayedException $e) {
         }
-        $request = new Dklab_SoapClient_Request($this, $args, $isAsync);
+        $request = new Dklab_SoapClient_Request($this, $args, $isAsync === true ? static::$DEFAULT_ASYNC_THROTTLING : $isAsync);
         $this->_recordedRequest = null;
         if ($isAsync) {
             // In async mode - return the request.
