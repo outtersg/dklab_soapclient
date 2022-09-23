@@ -2,6 +2,7 @@
 Dklab_SoapClient: simultaneous call waiting for the last request only
 --FILE--
 <?php
+$serverConcurrency = 2;
 require dirname(__FILE__) . '/init.php';
 
 $delay = 1;
