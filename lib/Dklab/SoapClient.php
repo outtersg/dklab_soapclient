@@ -75,6 +75,7 @@ class Dklab_SoapClient extends SoapClient
      * 
      * @see SoapClient::__doRequest
      */
+    #[\ReturnTypeWillChange]
     public function __doRequest($request, $location, $action, $version, $one_way = 0)
     {
         if ($this->_hasForcedResponse) {
@@ -99,6 +100,7 @@ class Dklab_SoapClient extends SoapClient
      * 
      * @see SoapClient::__call
      */
+    #[\ReturnTypeWillChange]
     public function __call($functionName, $arguments)
     {
         return $this->__soapCall($functionName, $arguments);
@@ -114,6 +116,7 @@ class Dklab_SoapClient extends SoapClient
      * 
      * @see SoapClient::__soapCall
      */
+    #[\ReturnTypeWillChange]
     public function __soapCall($functionName, $arguments, $options = array(), $inputHeaders = null, &$outputHeaders = null)
     {
         if (($throttle = $isAsync = !empty($options['async']))) {
@@ -146,6 +149,7 @@ class Dklab_SoapClient extends SoapClient
      * @param string $value
      * @return void
      */
+    #[\ReturnTypeWillChange]
     public function __setCookie($name, $value = null)
     {
         parent::__setCookie($name, $value);
