@@ -2,6 +2,7 @@
 Dklab_SoapClient: simultaneous call to a number of methods
 --FILE--
 <?php
+$serverConcurrency = 10;
 require dirname(__FILE__) . '/init.php';
 
 $nItr = 10;
