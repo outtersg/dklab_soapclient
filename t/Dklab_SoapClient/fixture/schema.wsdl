@@ -30,7 +30,7 @@
 	</binding>
 	<service name="schemaService">
 		<port name="schemaPort" binding="typens:schemaBinding">
-			<soap:address location="http://dklab.ru/lib/Dklab_SoapClient/demo/t/Dklab_SoapClient/fixture/server.php"/>
+			<soap:address location="http://localhost:10101/server.php"/>
 		</port>
 	</service>
 </definitions>
