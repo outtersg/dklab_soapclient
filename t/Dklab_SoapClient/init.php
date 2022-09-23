@@ -11,6 +11,10 @@ if (!preg_match('/<soap:address\s+location="(.*?)"/s', file_get_contents('fixtur
 	die("Cannot find target location in WSDL file!");
 }
 $location = dirname($m[1]) . "/nonwsdl.php";
+if (preg_match('#http://(localhost):([0-9]+)/#', $m[1], $serverMatch)) {
+	require_once dirname(__FILE__).'/fixture/server_launch.php';
+	requireServer($serverMatch[1], $serverMatch[2], isset($serverConcurrency) ? $serverConcurrency : 1);
+}
 
 // Non-WSDL client
 $nonWsdlClient = new Dklab_SoapClient(null, array(
