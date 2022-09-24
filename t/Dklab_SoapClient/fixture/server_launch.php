@@ -14,8 +14,19 @@ function serverRuns($host, $port, $concurrency = 1, $killIfNotEnoughConcurrency 
 		}
 		if ($killIfNotEnoughConcurrency) {
 			$pid = $r->PID;
-			fprintf(STDERR, "Killing server %d with concurrency %d...\n", $r->PID, $r->concurrency);
-			system("kill $pid");
+			if ($r->concurrency == 1) {
+				system("kill $pid");
+			} else {
+				// If the pid is a slave, we want to reach the master.
+				exec("ps -p {$r->PPID} -o pid,ppid,command", $rPPID);
+				$rPPID = array_pop($rPPID);
+				if (false !== strpos($rPPID, 'php -S ')) {
+					$pid = $r->PPID;
+				}
+				// And whoops, it seems that it is not receptive anymore to SIGINT (only SIGTERM, which lets orphans to be killed individually).
+				fprintf(STDERR, "Killing server %d with concurrency %d...\n", $pid, $r->concurrency);
+				system("kill $pid `ps -o pid,ppid | grep '[ 	]$pid$' | awk '{print\$1}'`");
+			}
 		}
 	}
 }
@@ -53,7 +64,13 @@ function serverInfo()
 	if(!$concurrency || version_compare(phpversion(), '7.4.0') < 0) {
 		$concurrency = 1;
 	}
-	echo json_encode(array('PID' => getmypid(), 'concurrency' => $concurrency));
+	$r = array
+	(
+		'PID' => getmypid(),
+		'PPID' => posix_getppid(),
+		'concurrency' => $concurrency,
+	);
+	echo json_encode($r);
 }
 
 if (!isset($GLOBALS['argv'])) {
