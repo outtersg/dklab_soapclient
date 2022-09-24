@@ -22,6 +22,13 @@ $nonWsdlClient = new Dklab_SoapClient(null, array(
 	'uri' => 'urn:schema',
 ));
 
+// Non-WSDL client with traces
+$nonWsdlClientWithTraces = new Dklab_SoapClient(null, array(
+	'location' => $location,
+	'uri' => 'urn:schema',
+	'trace' => true,
+));
+
 // Non-WSDL client with retries
 $nonWsdlClientWithRetry = new Dklab_SoapClient(null, array(
 	'location' => $location,
