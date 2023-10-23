@@ -370,6 +370,12 @@ class Dklab_SoapClient_Request
         // HTTP basic auth.
         if (isset($clientOptions['login']) && isset($clientOptions['password']) ) {
             $curlOptions[CURLOPT_USERPWD] = $clientOptions['login'] . ":" . $clientOptions['password'];
+            if (isset($clientOptions['authentication'])) {
+                switch ($clientOptions['authentication']) {
+                    case SOAP_AUTHENTICATION_BASIC: $curlOptions[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC; break;
+                    case SOAP_AUTHENTICATION_DIGEST: $curlOptions[CURLOPT_HTTPAUTH] = CURLAUTH_DIGEST; break;
+                }
+            }
             if (!isset($curlOptions[CURLOPT_HTTPAUTH])) {
                 $curlOptions[CURLOPT_HTTPAUTH] = CURLAUTH_ANY;
             }
